@@ -1,7 +1,7 @@
 import { ethers, Wallet } from "ethers";
 import { readFileSync, writeFileSync } from "fs";
 
-import { HelloToken, HelloToken__factory } from "./ethers-contracts";
+import { HelloToken, HelloToken__factory } from "./ethers-contracts.js";
 import { ChainId } from "@certusone/wormhole-sdk";
 
 export interface ChainInfo {

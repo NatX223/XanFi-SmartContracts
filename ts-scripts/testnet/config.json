@@ -1,6 +1,7 @@
 {
-  "sourceChain": 6,
-  "targetChain": 14,
+  "deployChain": 4,
+  "sourceChain": 14,
+  "targetChain": 4,
   "chains": [
     {
       "description": "Goerli - Ethereum",

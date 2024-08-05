@@ -4,10 +4,23 @@
     null,
     null,
     null,
-    null,
+    [
+      {
+        "WBTC": "0x4Be3003d0867D50D96F412F3936639C21cf7AbFb"
+      },
+      {
+        "WETH": "0x26dF42bE59F40a5611c3Fcf19d6206ac5D80feC3"
+      },
+      {
+        "WLD": "0x5D712Da5c7C3dF3F289E169B75b81235451b5a6D"
+      },
+      {
+        "W": "0x9ab4394b8458798015fFc9894f8c8e677d00040B"
+      }
+    ],
     null,
     [
-      "0xf2D5cCC108bb977e1F8a9C7239E572EFFffF09a1"
+      "0xFD986EFd85B1F0EaeeCb7cD12f629DF3951e5360"
     ],
     null,
     null,
@@ -16,7 +29,21 @@
     null,
     null,
     null,
-    null,
+    [
+      "0x20BBf81E1C01b3bab0ac085038fed3f781417cbD",
+      {
+        "WBTC": "0xe9cd8A5Bcb7a8e1F54F7B10264c9Ef7D604626Ca"
+      },
+      {
+        "WETH": "0x5ffA8c76dec86180ccAb42710bd58c4cDac4B919"
+      },
+      {
+        "WLD": "0xaA81a4724B4bB10b9d699248e7c3C981d6897b08"
+      },
+      {
+        "W": "0xe47DCB754c5BF3C1Db6eCaF0613a79829B417c95"
+      }
+    ],
     null,
     null,
     null,
@@ -45,7 +72,7 @@
     null,
     "0x47bBC88Ae36803C405CE1E0CaA8419E9eE35CFb8",
     null,
-    "0x5C8f6E90e59ea4c6C8EA0899c6529b3b49DAeB30",
+    "0x0DF100ADA26E2DAb98ac68B036690f583d3030C3",
     null,
     "0x64EDBf0f70b60d30eFB0e8d79Af30164f6996fA9",
     null,
@@ -55,7 +82,7 @@
     null,
     null,
     null,
-    "0xED8510d4ddcD34Ec352dF45F20185F90F24eD0b4",
+    "0x6A2fE51B2793879FC3d6C4bD54ec6337Eb7de2B4",
     null,
     "0x2768B7BDc5cD3154553021A74534e85Ac6cdc07D",
     null,

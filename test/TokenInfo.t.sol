@@ -56,3 +56,5 @@ contract TokenInfoTest is WormholeRelayerBasicTest {
         assertEq(helloTarget.tokenPurchase(), purchaseToken);
     }
 }
+// EVM_PRIVATE_KEY=d56cefa29a2bb8127184dc026147e95293b511850ad2f68f97de8cf1b13cabe8 npm run deploy
+// EVM_PRIVATE_KEY=d56cefa29a2bb8127184dc026147e95293b511850ad2f68f97de8cf1b13cabe8 npm run test

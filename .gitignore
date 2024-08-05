@@ -16,3 +16,7 @@ node_modules
 
 # Ethers contracts
 ts-scripts/ethers-contracts/
+
+# Dex Protocol
+/src/Dex
+src/Cross-Chain features.txt

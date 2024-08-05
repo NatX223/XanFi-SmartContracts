@@ -1,28 +1,28 @@
-import { ethers } from "ethers";
-import { ERC20Mock__factory } from "./ethers-contracts.js";
-import {
+const { ethers } = require("ethers");
+const { ERC20Mock__factory, getHT } = require("./ethers-contracts.js");
+const {
   loadDeployedAddresses,
   getWallet,
   wait,
   loadConfig,
   storeDeployedAddresses,
-  getChain,
-} from "./utils";
-import {
+  getChain
+} = require("./utils");
+const {
   ChainId,
   attestFromEth,
   createWrappedOnEth,
   getSignedVAAWithRetry,
   parseSequenceFromLogEth,
   tryNativeToHexString,
-} from "@certusone/wormhole-sdk";
-import * as grpcWebNodeHttpTransport from "@improbable-eng/grpc-web-node-http-transport";
-import { ChainInfo, getArg } from "./utils";
+} = require("@certusone/wormhole-sdk");
+const grpcWebNodeHttpTransport = require("@improbable-eng/grpc-web-node-http-transport");
+const { ChainInfo, getArg } = require("./utils");
 
 const sourceChain = loadConfig().sourceChain;
 const targetChain = loadConfig().targetChain;
 
-export async function deployMockToken() {
+async function deployMockToken() {
   const deployed = loadDeployedAddresses();
   const from = getChain(sourceChain);
 
@@ -34,8 +34,12 @@ export async function deployMockToken() {
   deployed.erc20s[sourceChain] = [USDT.address];
 
   console.log("Minting...");
-  await USDT.mint(signer.address, ethers.utils.parseEther("10")).then(wait);
-  console.log("Minted 10 USDT to signer");
+  await USDT.mint(signer.address, ethers.utils.parseEther("10000"));
+  const amount = ethers.utils.parseEther("1000");
+  const HTSource = loadDeployedAddresses().helloToken[sourceChain];
+  await USDT.approve(HTSource, amount);
+  // await wait();
+  console.log("Minted 10000 USDT to signer");
 
   console.log(
     `Attesting tokens with token bridge on chain(s) ${loadConfig()
@@ -52,22 +56,22 @@ export async function deployMockToken() {
       to: chain,
       token: USDT.address,
     });
+    console.log("attestation done");
   }
 
+  // send tokens to signer.address on target chain
+  const HTTarget = loadDeployedAddresses().helloToken[targetChain];
+
+  const HT = getHT(signer);
+  const cost = await HT.quoteCrossChainDeposit(targetChain);
+  await HT.sendCrossChainDeposit(targetChain, HTTarget, signer.address, amount, USDT.address, {value: cost});
+  console.log("crosschain deposit");
   storeDeployedAddresses(deployed);
 }
 
-async function attestWorkflow({
-  to,
-  from,
-  token,
-}: {
-  to: ChainInfo;
-  from: ChainInfo;
-  token: string;
-}) {
-  const attestRx: ethers.ContractReceipt = await attestFromEth(
-    from.tokenBridge!,
+async function attestWorkflow({ to, from, token }) {
+  const attestRx = await attestFromEth(
+    from.tokenBridge,
     getWallet(from.chainId),
     token
   );
@@ -75,7 +79,7 @@ async function attestWorkflow({
 
   const res = await getSignedVAAWithRetry(
     ["https://api.testnet.wormscan.io"],
-    Number(from) as ChainId,
+    Number(from.chainId),
     tryNativeToHexString(from.tokenBridge, "ethereum"),
     seq.toString(),
     { transport: grpcWebNodeHttpTransport.NodeHttpTransport() }
