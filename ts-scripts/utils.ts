@@ -11,6 +11,8 @@ export interface ChainInfo {
   tokenBridge: string;
   wormholeRelayer: string;
   wormhole: string;
+  purchaseToken: string;
+  helperAddress: string;
 }
 
 export interface Config {

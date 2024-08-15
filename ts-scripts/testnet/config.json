@@ -1,7 +1,7 @@
 {
-  "deployChain": 4,
+  "deployChain": 14,
   "sourceChain": 14,
-  "targetChain": 4,
+  "targetChain": 16,
   "chains": [
     {
       "description": "Goerli - Ethereum",
@@ -25,15 +25,19 @@
       "rpc": "https://alfajores-forno.celo-testnet.org",
       "tokenBridge": "0x05ca6037eC51F8b712eD2E6Fa72219FEaE74E153",
       "wormholeRelayer": "0x306B68267Deb7c5DfCDa3619E22E9Ca39C374f84",
-      "wormhole": "0x88505117CA88e7dd2eC6EA1E13f0948db2D50D56"
+      "wormhole": "0x88505117CA88e7dd2eC6EA1E13f0948db2D50D56",
+      "purchaseToken": "0x20BBf81E1C01b3bab0ac085038fed3f781417cbD",
+      "helperAddress": "0xe21578A43EbD478Ce03CdCCC8d0209b16c92C3eB"
     },
     {
       "description": "BSC Testnet",
       "chainId": 4,
-      "rpc": "https://bsc-testnet.public.blastapi.io",
+      "rpc": "https://indulgent-fabled-dream.bsc-testnet.quiknode.pro/52473971ad5ccfea8f644b83b0d1d118716a9f63/",
       "tokenBridge": "0x9dcF9D205C9De35334D646BeE44b2D2859712A09",
       "wormholeRelayer": "0x80aC94316391752A193C1c47E27D382b507c93F3",
-      "wormhole": "0x68605AD7b15c732a30b1BbC62BE8F2A509D74b4D"
+      "wormhole": "0x68605AD7b15c732a30b1BbC62BE8F2A509D74b4D",
+      "purchaseToken": "0xAab045daa8624ec3F90A34DD1F5EE1dF95148588o",
+      "helperAddress": "0x0149CB9ac47147fb388031B8dA874a5d163d143E"
     },
     {
       "description": "Polygon Mumbai",

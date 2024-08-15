@@ -20,7 +20,19 @@
     ],
     null,
     [
-      "0xFD986EFd85B1F0EaeeCb7cD12f629DF3951e5360"
+      "0x6e201D2aDDccac6c4c2debb21146fad175847916",
+      {
+        "WBTC": "0x5474C94152DFeB642607758dECF156f590D092dD"
+      },
+      {
+        "WETH": "0xe462B2Bd44853a3Ab56b5b0C7Db76Bc27306f19E"
+      },
+      {
+        "WLD": "0x434aD648975CBd38dFcc7381E0b2b15079bB7dE1"
+      },
+      {
+        "W": "0x4971C16Ad4Dd04ED489A249145A27F1d42af2420"
+      }
     ],
     null,
     null,
@@ -45,7 +57,20 @@
       }
     ],
     null,
-    null,
+    [
+      {
+        "WBTC": "0x5474C94152DFeB642607758dECF156f590D092dD"
+      },
+      {
+        "WETH": "0xe462B2Bd44853a3Ab56b5b0C7Db76Bc27306f19E"
+      },
+      {
+        "WLD": "0x434aD648975CBd38dFcc7381E0b2b15079bB7dE1"
+      },
+      {
+        "W": "0x4971C16Ad4Dd04ED489A249145A27F1d42af2420"
+      }
+    ],
     null,
     null,
     null,
@@ -74,7 +99,7 @@
     null,
     "0x0DF100ADA26E2DAb98ac68B036690f583d3030C3",
     null,
-    "0x64EDBf0f70b60d30eFB0e8d79Af30164f6996fA9",
+    "0xb2C3FA7E08E30820Fd8D02BE18DFAE9714f8401a",
     null,
     null,
     null,
@@ -84,7 +109,7 @@
     null,
     "0x6A2fE51B2793879FC3d6C4bD54ec6337Eb7de2B4",
     null,
-    "0x2768B7BDc5cD3154553021A74534e85Ac6cdc07D",
+    "0x20BBf81E1C01b3bab0ac085038fed3f781417cbD",
     null,
     null,
     null,
@@ -99,6 +124,74 @@
     null,
     null,
     "0xFE1BE9F3f86bDA2Eb36D317DCFA1C63207952fC2",
+    null
+  ],
+  "factoryAddresses": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    "0x72E5149861700497C9ec0ee51eacbfDd4F97AD6e",
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+  ],
+  "routerAddresses": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    "0x97e7d41E3dDDBBf9111C765C469560994F0ed567",
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
     null
   ]
 }
