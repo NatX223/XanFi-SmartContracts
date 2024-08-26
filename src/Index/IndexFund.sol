@@ -36,13 +36,13 @@ interface IRouter {
      * @notice Function to redeem tokens across different chains
      * @param _totalSupply The total supply of the asset being redeemed
      * @param _targetIndex The index contract address of the target chain where the asset will be redeemed
-     * @param _userBalance The balance of the user initiating the cross-chain redemption
+     * @param amount The balance of the user initiating the cross-chain redemption
      * @param _assetContract The address of the asset contract being redeemed
      * @param targetChain The ID of the chain where the asset is to be redeemed
      * @param receiver The address of the receiver on the target chain
      * @param purchaseToken The address of the token used for the purchase
      */
-    function crossChainRedeem(uint256 _totalSupply, address _targetIndex, uint256 _userBalance, address _assetContract, uint16 targetChain, address receiver, address purchaseToken) external payable;
+    function crossChainRedeem(uint256 _totalSupply, address _targetIndex, uint256 amount, address _assetContract, uint16 targetChain, address receiver, address purchaseToken) external payable;
 
     /**
      * @notice Function to retrieve the price of a index

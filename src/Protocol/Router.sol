@@ -37,13 +37,13 @@ contract Router is IWormholeReceiver, Ownable {
         );
     }
 
-    function crossChainRedeem(uint256 _totalSupply, address _targetIndex, uint256 _userBalance, address _assetContract, uint16 targetChain, address receiver, address purchaseToken) public payable {
+    function crossChainRedeem(uint256 _totalSupply, address _targetIndex, uint256 amount, address _assetContract, uint16 targetChain, address receiver, address purchaseToken) public payable {
         uint256 cost = quoteCrossChainMessage(targetChain);
         require(msg.value == cost, "not enough gas");
         wormholeRelayer.sendPayloadToEvm{value: cost}(
             targetChain,
             routerAddresses[targetChain],
-            abi.encode(_totalSupply, _assetContract, _userBalance, _targetIndex, receiver, purchaseToken, chainId), // payload
+            abi.encode(_totalSupply, _assetContract, amount, _targetIndex, receiver, purchaseToken, chainId), // payload
             0,
             GAS_LIMIT
         );
