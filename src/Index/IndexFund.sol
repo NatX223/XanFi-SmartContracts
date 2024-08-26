@@ -6,51 +6,80 @@ import "openzeppelin-contracts/token/ERC20/ERC20.sol";
 import "wormhole-solidity-sdk/WormholeRelayerSDK.sol";
 import "wormhole-solidity-sdk/interfaces/IWormholeRelayer.sol";
 import "wormhole-solidity-sdk/interfaces/IWormholeReceiver.sol";
-import "./UniswapHelper.sol";
 
+// Interface for the Token Bridge, which is responsible for handling cross-chain operations.
 interface ITokenBridge {
     /**
-     * @notice Function to retrieve the address of the wrapped asset corresponding to a specific token on another chain
-     * @param tokenChainId The ID of the chain where the original token exists
-     * @param tokenAddress The address of the original token on the source chain
-     * @return The address of the wrapped asset on the current chain
+     * @notice Returns the address of the wrapped asset for a given token on a specific chain.
+     * @param tokenChainId The chain ID of the original token.
+     * @param tokenAddress The address of the original token on its chain.
+     * @return The address of the wrapped asset on the current chain.
      */
     function wrappedAsset(uint16 tokenChainId, bytes32 tokenAddress) external view returns (address);
 }
 
+// Interface for the Factory contract, which handles index fund contract creation.
 interface IFactory {
     /**
-     * @notice Function to retrieve the address of the token used for purchases
-     * @return The address of the purchase token
+     * @notice Returns the address of the token used for purchases (e.g., USDT).
+     * @return The address of the purchase token contract.
      */
-    function purchaseToken() external view returns(address);
+    function purchaseToken() external view returns (address);
 
     /**
-     * @notice Function to retrieve the address of the token bridge contract on the currnt chain
-     * @return The address of the token bridge
+     * @notice Returns the address of the token bridge contract used for cross-chain transfers.
+     * @return The address of the token bridge contract.
      */
-    function tokenBridge() external view returns(address);
+    function tokenBridge() external view returns (address);
 }
+
+// Interface for the Router contract, which manages cross-chain communication and asset swaps.
 interface IRouter {
     /**
-     * @notice Function to redeem tokens across different chains
-     * @param _totalSupply The total supply of the asset being redeemed
-     * @param _targetIndex The index contract address of the target chain where the asset will be redeemed
-     * @param amount The balance of the user initiating the cross-chain redemption
-     * @param _assetContract The address of the asset contract being redeemed
-     * @param targetChain The ID of the chain where the asset is to be redeemed
-     * @param receiver The address of the receiver on the target chain
-     * @param purchaseToken The address of the token used for the purchase
+     * @notice Handles cross-chain redemption of index tokens.
+     * @param _totalSupply The total supply of the index fund tokens.
+     * @param _targetIndex The address of the target index on the destination chain.
+     * @param amount The amount of index tokens to redeem.
+     * @param _assetContract The address of the asset being redeemed.
+     * @param targetChain The chain ID of the target chain.
+     * @param receiver The address receiving the redeemed assets.
+     * @param purchaseToken The address of the token used for the purchase.
      */
-    function crossChainRedeem(uint256 _totalSupply, address _targetIndex, uint256 amount, address _assetContract, uint16 targetChain, address receiver, address purchaseToken) external payable;
+    function crossChainRedeem(
+        uint256 _totalSupply,
+        address _targetIndex,
+        uint256 amount,
+        address _assetContract,
+        uint16 targetChain,
+        address receiver,
+        address purchaseToken
+    ) external payable;
 
     /**
-     * @notice Function to retrieve the price of a index
-     * @param fundAddress The address of the index 
-     * @return The price of the fund
+     * @notice Returns the current price of the index fund.
+     * @param fundAddress The address of the index fund contract.
+     * @return The price of the index fund.
      */
-    function getPrice(address fundAddress) external view returns(uint256);
+    function getPrice(address fundAddress) external view returns (uint256);
 }
+
+// Interface for the decentralized exchange (DEX) router used for asset swaps.
+interface dexRouter {
+    /**
+     * @notice Swaps a specific amount of one token for another.
+     * @param receiver The address receiving the output tokens.
+     * @param amountIn The amount of the input token to swap.
+     * @param tokenIn The ERC20 token being swapped.
+     * @param tokenOut The ERC20 token to receive from the swap.
+     */
+    function swapExactTokens(
+        address receiver,
+        uint256 amountIn,
+        IERC20 tokenIn,
+        IERC20 tokenOut
+    ) external;
+}
+
 
 /**
  * @title IndexFund
@@ -70,6 +99,12 @@ contract IndexFund is TokenSender, TokenReceiver, ERC20, UniswapHelper {
      * @dev This is a constant value set to 300,000.
      */
     uint256 constant GAS_LIMIT = 300_000;
+
+    /**
+     * @notice The Rceived event.
+     * @dev This event is emitted anytime the contract receives native coins.
+     */
+    event Received(address sender, uint amount);
 
     /**
      * @notice The initial supply of tokens for the index fund.
@@ -101,6 +136,12 @@ contract IndexFund is TokenSender, TokenReceiver, ERC20, UniswapHelper {
      * @notice The address of the router contract used for cross-chain operations.
      */
     address public routerAddress;
+
+    /**
+     * @notice Address of the decentralized exchange (DEX) router used for asset swaps.
+     * @dev This address points to the contract responsible for handling token swaps on a DEX.
+     */
+    address public dexRouterAddress;
 
     /**
      * @notice Indicates whether the contract has been initialized.
@@ -137,10 +178,10 @@ contract IndexFund is TokenSender, TokenReceiver, ERC20, UniswapHelper {
      * @param _tokenBridge The address of the Token Bridge contract.
      * @param _wormhole The address of the Wormhole contract.
      * @param _owner The address of the contract owner.
-     * @param helperAddress The address of the UniswapHelper contract.
+     * @param _dexRouterAddress The address of the integrated Dex router contract.
+     * @param _factoryAddress The address of the protocol factory contract.
      * @dev The constructor also initializes the inherited ERC20, TokenBase, and UniswapHelper contracts.
      *      - The `owner` is set to the provided `_owner` address.
-     *      - `factoryAddress` is set to the address that deployed the contract.
      *      - The `wormholeRelayer_` is set to an instance of the IWormholeRelayer contract.
      */
     constructor(
@@ -150,13 +191,23 @@ contract IndexFund is TokenSender, TokenReceiver, ERC20, UniswapHelper {
         address _tokenBridge,
         address _wormhole,
         address _owner,
-        address helperAddress
+        address _dexRouterAddress
+        address _factoryAddress
     ) ERC20(_name, _symbol) TokenBase(_wormholeRelayer, _tokenBridge, _wormhole) UniswapHelper(helperAddress) {
         owner = _owner;
-        factoryAddress = msg.sender;
+        factoryAddress = _factoryAddress;
+        dexRouterAddress = _dexRouterAddress;
         wormholeRelayer_ = IWormholeRelayer(_wormholeRelayer);
     }
 
+    /**
+     * @notice Handles recption of native coin to the smart contract.
+     * @dev Native coins can be sent to the contract to offset the 
+     * wormhole crosschain operations.
+     */
+    receive() external payable {
+        emit Received(msg.sender, msg.value);
+    }
 
     /**
      * @notice Mints a specified amount of tokens to the caller's address.
@@ -234,22 +285,8 @@ contract IndexFund is TokenSender, TokenReceiver, ERC20, UniswapHelper {
 
         for (uint16 i = 0; i < assetChains.length; i++) {
             if (assetChains[i] == chainId) {
-                bytes memory data = abi.encodeWithSelector(
-                    this.buyToken.selector,
-                    assetContracts[i],
-                    tokenAmounts[i],
-                    address(this),
-                    purchaseToken
-                );
-
-                (bool success, bytes memory result) = address(this).delegatecall(data);
-                if (!success) {
-                    if (result.length < 68) revert();
-                    assembly {
-                        result := add(result, 0x04)
-                    }
-                    revert(abi.decode(result, (string)));
-                }
+                IERC20(purchaseToken).approve(dexRouterAddress, tokenAmounts[i]);
+                dexRouter(dexRouterAddress).swapExactTokens(address(this), tokenAmounts[i], IERC20(purchaseToken), IERC20(assetContracts[i]));
             } else {
                 bytes memory payload = abi.encode(assetContracts[i]);
                         
@@ -264,17 +301,18 @@ contract IndexFund is TokenSender, TokenReceiver, ERC20, UniswapHelper {
                 );
             }
         }
-                
+        
+        if (balanceOf(msg.sender) == 0) {
+            owners += 1;
+        }
+
         // Mint tokens to the user
         if (initialMint == false) {
             mint(initialSupply);
             initialMint = true;
         } else {
-            mint(10);  // Replace with appropriate mint logic as needed
-        }
-        
-        if (balanceOf(msg.sender) == 0) {
-            owners += 1;
+            uint256 price = IRouter(routerAddress).getPrice(address(this));
+            uint256 mintAmount = amount / price;
         }
     }
 
@@ -288,62 +326,32 @@ contract IndexFund is TokenSender, TokenReceiver, ERC20, UniswapHelper {
      *      - The user's tokens are burned after the redemption process.
      * @require The user must have a balance of tokens equal to or greater than the specified `amount`.
      */
-    function Redeem(uint amount, address targetIndex) public payable {
+    function Redeem(uint amount, address[] targetIndex) public payable {
         require(amount <= balanceOf(msg.sender), "You do not have enough tokens");
 
-        // Iterate through assetContracts to handle the redemption process
+        // run through assetContracts in a loop
         for (uint i = 0; i < assetContracts.length; i++) {
             if (assetChains[i] == chainId) {
-                // Handle local asset redemption
-                uint256 tokenSellAmount = (balanceOf(msg.sender) * IERC20(assetContracts[i]).balanceOf(address(this))) / totalSupply();
+                uint256 tokenSellAmount = (amount * IERC20(assetContracts[i]).balanceOf(address(this))) / totalSupply();
                 address purchaseToken = IFactory(factoryAddress).purchaseToken();
-                bytes memory data = abi.encodeWithSelector(
-                    this.sellToken.selector,
-                    assetContracts[i],
-                    tokenSellAmount,
-                    msg.sender,
-                    purchaseToken
-                );
-                (bool success, bytes memory result) = address(this).delegatecall(data);
-                if (!success) {
-                    if (result.length < 68) revert();
-                    assembly {
-                        result := add(result, 0x04)
-                    }
-                    revert(abi.decode(result, (string)));
-                }
-            } else {
-                // Handle cross-chain asset redemption
+
+                IERC20(purchaseToken).approve(dexRouterAddress, tokenSellAmount);
+                dexRouter(dexRouterAddress).swapExactTokens(address(this), tokenSellAmount, IERC20(assetContracts[i]), IERC20(purchaseToken));
+            }
+            else {
                 uint256 cost = quoteCrossChainMessage(assetChains[i]);
                 address purchaseToken = IFactory(factoryAddress).purchaseToken();
-                IRouter(routerAddress).crossChainRedeem{value: cost}(
-                    totalSupply(),
-                    targetIndex,
-                    balanceOf(msg.sender),
-                    assetContracts[i],
-                    assetChains[i],
-                    msg.sender,
-                    purchaseToken
-                );
+                IRouter(routerAddress).crossChainRedeem{value: cost}(totalSupply(), targetIndex[i], amount, assetContracts[i], assetChains[i], msg.sender, purchaseToken);
             }
         }
-        // Burn the user's tokens after redemption
+
+        // Burn tokens
         _burn(msg.sender, amount);
+        
+        if (balanceOf(msg.sender) == 0) {
+            owners -= 1;
+        }
     }
-
-    // function to return all prices of the tokens
-    // function getPrice(address token) internal view returns(uint price) {
-    //     // write interface and instatiate
-    //     IERC20 Itoken = IERC20(token);
-    //     uint decimal = Itoken.decimals();
-    //     uint amountIn = 1 * (10 ** decimal);
-    //     price = estimateAmountOut(token, amountIn);
-    // }
-
-    // function to return fund details
-    // function Details() public view returns (address, address[] memory, string[] memory, uint[] memory, uint) {
-    //     return(owner, assetContracts, assetsNames, assetsRatio, owners);
-    // }
 
     function quoteCrossChainDeposit(
         uint16 targetChain
@@ -379,9 +387,7 @@ contract IndexFund is TokenSender, TokenReceiver, ERC20, UniswapHelper {
      * @param deliveryHash A hash representing the delivery of the message, not used in this function.
      * @dev This function:
      *      - Decodes the payload to retrieve the asset contract address.
-     *      - Encodes a call to `buyToken` with the asset contract address and received token amount.
-     *      - Uses `delegatecall` to execute the `buyToken` function on the current contract.
-     *      - Handles potential errors from the delegate call by reverting with an appropriate error message.
+     *      - Calls the dex router function in order to purchase the specified asset tokens.
      * @require The `receivedTokens` array must contain exactly one token transfer.
      * @require The function can only be called by the Wormhole relayer, enforced by the `onlyWormholeRelayer` modifier.
      */
@@ -395,29 +401,13 @@ contract IndexFund is TokenSender, TokenReceiver, ERC20, UniswapHelper {
         require(receivedTokens.length == 1, "Expected 1 token transfers");
 
         (address assetContract) = abi.decode(payload, (address));
-
-        bytes memory data = abi.encodeWithSelector(
-            this.buyToken.selector,
-            assetContract,
-            receivedTokens[0].amount,
-            address(this),
-            receivedTokens[0].tokenAddress
-        );
-
-        (bool success, bytes memory result) = address(this).delegatecall(data);
-
-        if (!success) {
-            if (result.length < 68) revert();
-            assembly {
-                result := add(result, 0x04)
-            }
-            revert(abi.decode(result, (string)));
-        }
+        IERC20(receivedTokens[0].tokenAddress).approve(dexRouterAddress, receivedTokens[0].amount);
+        dexRouter(dexRouterAddress).swapExactTokens(address(this), receivedTokens[0].amount, IERC20(receivedTokens[0].tokenAddress), IERC20(assetContract));
     }
 
     /**
      * @notice Handles the sale of tokens and transfers the proceeds to a specified receiver.
-     * @param userSupply The amount of tokens the user is supplying for the sale.
+     * @param amount The amount of tokens the user wants to sell.
      * @param fundTotalSupply The total supply of tokens in the fund.
      * @param tokenAddress The address of the token being sold.
      * @param receiver The address to which the proceeds from the sale will be sent.
@@ -426,14 +416,11 @@ contract IndexFund is TokenSender, TokenReceiver, ERC20, UniswapHelper {
      * @dev This function:
      *      - Ensures that only the designated router contract can call it.
      *      - Calculates the amount of tokens to be sold based on the user’s supply and the fund’s total supply.
-     *      - Retrieves the wrapped token address from the token bridge.
-     *      - Encodes a call to `sellToken` with the calculated parameters.
-     *      - Uses `delegatecall` to execute the `sellToken` function on the current contract.
-     *      - Handles errors from the delegate call by reverting with an appropriate error message.
+     *      - Calls the dex router function in order to sell off the specified asset tokens.
      * @require The caller must be the router contract, as enforced by the `require` statement.
      */
     function sale(
-        uint256 userSupply,
+        uint256 amount,
         uint256 fundTotalSupply,
         address tokenAddress,
         address receiver,
@@ -452,36 +439,31 @@ contract IndexFund is TokenSender, TokenReceiver, ERC20, UniswapHelper {
         address tokenBridgeAddress = IFactory(factoryAddress).tokenBridge();
         address outputToken = ITokenBridge(tokenBridgeAddress).wrappedAsset(sourceChainId, outputTokenHomeAddress);
 
-        // Encode the data for the `sellToken` function call
-        bytes memory data = abi.encodeWithSelector(
-            this.sellToken.selector,
-            tokenAddress,
-            sellAmount,
-            receiver,
-            outputToken
-        );
-
-        // Execute the `sellToken` function using `delegatecall`
-        (bool success, bytes memory result) = address(this).delegatecall(data);
-
-        // Handle potential errors from the `delegatecall`
-        if (!success) {
-            if (result.length < 68) revert();
-            assembly {
-                result := add(result, 0x04)
-            }
-            revert(abi.decode(result, (string)));
-        }
+        // Call the Dex Router Contract
+        IERC20(tokenAddress).approve(dexRouterAddress, sellAmount);
+        dexRouter(dexRouterAddress).swapExactTokens(receiver, sellAmount, IERC20(tokenAddress), IERC20(outputToken));
     }
 
-
-    // modifier addressCheck(address[] memory tokenAddresses) {
-    //     for (uint i = 0; i < tokenAddresses.length; i++) {
-    //         require(tokenAddresses[i] != address(0), "Invalid token address");
-    //     }
-    //     _;
-    // }
-
-    // rebalancing
-    // native buy/sell
+    /**
+     * @notice Handles the sremoval and addition of assets in an index.
+     * @param oldAssetAddress The address of asset to be replaced in the index.
+     * @param newAssetAddress The address of the new asset to be included in the index.
+     * @dev This function:
+     *      - Ensures that only the owner of the index contract can call it.
+     *      - Sells off all the tokens of the asset being replaced that are held in the index smart contract.
+     *      - Buys the new asset tokens using the proceeds from the previous sale.
+     * @require The caller must be the router contract, as enforced by the `require` statement.
+     */
+    function replaceAsset(address oldAssetAddress, address newAssetAddress) public {
+        require(msg.sender == owner, "only contract owner can call this function");
+        address purchaseToken = IFactory(factoryAddress).purchaseToken();
+        // sell off old token
+        uint256 oldAmount = IERC20(oldAssetAddress).balanceOf(address(this));
+        IERC20(oldAssetAddress).approve(dexRouterAddress, oldAmount);
+        dexRouter(dexRouterAddress).swapExactTokens(address(this), oldAmount, IERC20(oldAssetAddress), IERC20(purchaseToken));
+        // buy the new token
+        uint256 newAmount = IERC20(purchaseToken).balanceOf(address(this));
+        IERC20(purchaseToken).approve(dexRouterAddress, newAmount);
+        dexRouter(dexRouterAddress).swapExactTokens(address(this), oldAmount, IERC20(purchaseToken), IERC20(newAssetAddress));
+    }
 }
