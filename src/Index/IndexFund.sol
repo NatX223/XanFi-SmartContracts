@@ -84,7 +84,7 @@ interface dexRouter {
 /**
  * @title IndexFund
  * @notice This contract represents an index fund and includes functionality for sending and receiving tokens,
- *         interacting with Uniswap, and managing ERC20 tokens.
+ *         interacting with a Dex, and managing ERC20 tokens.
  * @dev Inherits from the TokenSender, TokenReceiver, ERC20, and UniswapHelper contracts.
  */
 contract IndexFund is TokenSender, TokenReceiver, ERC20, UniswapHelper {
