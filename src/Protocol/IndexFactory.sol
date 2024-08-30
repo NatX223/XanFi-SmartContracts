@@ -40,6 +40,11 @@ contract IndexFactory is Ownable {
     address routerAddress;
 
     /**
+     * @notice Address of the protocol token migrator contract used for performing cross-chain index tokens migration.
+     */
+    address tokenMigratorAddress;
+
+    /**
      * @notice Address of the Token Bridge contract used for transferring tokens across different blockchain networks via the Wormhole protocol.
      */
     address tokenBridgeAddress;
@@ -161,6 +166,7 @@ contract IndexFactory is Ownable {
      * @param _chainId The chain ID representing the blockchain network where this contract is deployed.
      * @param _dexRouterAddress The address of the decentralized exchange (DEX) router used for swapping tokens within the index fund.
      * @param _routerAddress The address of an additional router contract used for token management or other operations.
+     * @param _tokenMigratorAddress The address of an token Migrator contract.
      * @dev The constructor sets the contract owner using the Ownable pattern. It also initializes several key addresses and parameters 
      *      related to cross-chain communication, token management, and index fund operations.
      */
@@ -171,7 +177,8 @@ contract IndexFactory is Ownable {
         address purchaseToken_, 
         uint16 _chainId, 
         address _dexRouterAddress, 
-        address _routerAddress
+        address _routerAddress,
+        address _tokenMigratorAddress
     ) Ownable(msg.sender) {
         tokenBridgeAddress = _tokenBridge;
         wormholeAddress = _wormhole;
@@ -181,6 +188,7 @@ contract IndexFactory is Ownable {
         _purchaseToken = purchaseToken_;
         dexRouterAddress = _dexRouterAddress;
         routerAddress = _routerAddress;
+        tokenMigratorAddress = _tokenMigratorAddress;
     }
 
     function quoteCrossChainDeployment(
@@ -270,7 +278,7 @@ contract IndexFactory is Ownable {
         uint16[] memory _assetChains
     ) internal returns(address indexAddress) {
         IndexFund newIndex = new IndexFund(_name, _symbol, wormholeRelayerAddress, tokenBridgeAddress, wormholeAddress, _owner, dexRouterAddress, address(this));
-        newIndex.initializeIndex(_assetContracts, _assetRatio, _assetChains, chainId, routerAddress);
+        newIndex.initializeIndex(_assetContracts, _assetRatio, _assetChains, chainId, routerAddress, tokenMigratorAddress);
         indicies[_indexCount.current()] = address(newIndex);
         _indexCount.increment();
         indexAddress = address(newIndex);
@@ -314,10 +322,7 @@ contract IndexFactory is Ownable {
     /**
      * @notice Handles incoming messages from the Wormhole Relayer containing index fund deployment details.
      * @param payload The encoded payload containing the index fund details (name, symbol, owner, assets, etc.).
-     * @param additionalVaas Not used in this implementation, but reserved for additional VAA data if needed.
-     * @param sourceAddress The address of the contract that called `sendPayloadToEvm` on the source chain.
      * @param sourceChain The chain ID of the source blockchain network.
-     * @param deliveryId A unique identifier for the message delivery.
      * @dev The function can only be called by the Wormhole Relayer. It decodes the payload, creates a new `fund` struct with the provided details,
      *      and stores it in the `funds` mapping. The `fundCount` counter is incremented to track the newly created fund.
      */

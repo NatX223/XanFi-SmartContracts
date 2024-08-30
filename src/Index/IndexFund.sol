@@ -80,14 +80,33 @@ interface dexRouter {
     ) external;
 }
 
+// Interface for the token migrator contract used for migrating tokens across chains.
+interface IMigrator {
+    /**
+     * @notice Initiates the migration of tokens from one chain to another.
+     * @param holder The address of the token holder initiating the migration.
+     * @param amount The amount of tokens to be migrated.
+     * @param targetIndex The address of the target index contract on the destination chain.
+     * @dev This function is intended to be called by contracts managing the token migration process.
+     *      It facilitates the movement of tokens from the current chain to a specified index on the target chain.
+     *      The implementation should handle the necessary cross-chain communication and ensure that 
+     *      the tokens are properly credited to the `targetIndex` on the destination chain.
+     */
+    function migrateToken(
+        address holder,
+        uint256 amount,
+        address targetIndex,
+        uint16 targetChain
+    ) external payable;
+}
 
 /**
  * @title IndexFund
  * @notice This contract represents an index fund and includes functionality for sending and receiving tokens,
  *         interacting with a Dex, and managing ERC20 tokens.
- * @dev Inherits from the TokenSender, TokenReceiver, ERC20, and UniswapHelper contracts.
+ * @dev Inherits from the TokenSender, TokenReceiver, ERC20 contracts.
  */
-contract IndexFund is TokenSender, TokenReceiver, ERC20, UniswapHelper {
+contract IndexFund is TokenSender, TokenReceiver, ERC20 {
 
     /**
      * @notice The ID of the chain on which this contract is deployed.
@@ -138,6 +157,11 @@ contract IndexFund is TokenSender, TokenReceiver, ERC20, UniswapHelper {
     address public routerAddress;
 
     /**
+     * @notice The address of the token migrator contract used for cross-chain token migration.
+     */
+    address public tokenMigratorAddress;
+
+    /**
      * @notice Address of the decentralized exchange (DEX) router used for asset swaps.
      * @dev This address points to the contract responsible for handling token swaps on a DEX.
      */
@@ -180,7 +204,7 @@ contract IndexFund is TokenSender, TokenReceiver, ERC20, UniswapHelper {
      * @param _owner The address of the contract owner.
      * @param _dexRouterAddress The address of the integrated Dex router contract.
      * @param _factoryAddress The address of the protocol factory contract.
-     * @dev The constructor also initializes the inherited ERC20, TokenBase, and UniswapHelper contracts.
+     * @dev The constructor also initializes the inherited ERC20, and TokenBase contracts.
      *      - The `owner` is set to the provided `_owner` address.
      *      - The `wormholeRelayer_` is set to an instance of the IWormholeRelayer contract.
      */
@@ -191,9 +215,9 @@ contract IndexFund is TokenSender, TokenReceiver, ERC20, UniswapHelper {
         address _tokenBridge,
         address _wormhole,
         address _owner,
-        address _dexRouterAddress
+        address _dexRouterAddress,
         address _factoryAddress
-    ) ERC20(_name, _symbol) TokenBase(_wormholeRelayer, _tokenBridge, _wormhole) UniswapHelper(helperAddress) {
+    ) ERC20(_name, _symbol) TokenBase(_wormholeRelayer, _tokenBridge, _wormhole) {
         owner = _owner;
         factoryAddress = _factoryAddress;
         dexRouterAddress = _dexRouterAddress;
@@ -210,15 +234,18 @@ contract IndexFund is TokenSender, TokenReceiver, ERC20, UniswapHelper {
     }
 
     /**
-     * @notice Mints a specified amount of tokens to the caller's address.
-     * @param mintAmount The amount of tokens to be minted.
-     * @dev This function is internal and can only be called from within the contract or derived contracts.
-     *      The newly minted tokens are sent to the caller (`msg.sender`).
+     * @notice Mints a specified amount of tokens to a holder's address during the migration process.
+     * @param holder The address of the token holder who will receive the newly minted tokens.
+     * @param amount The amount of tokens to be minted.
+     * @dev This function is external and can only be called by the designated token migrator contract.
+     *      It ensures that only the authorized contract can mint tokens during the migration process.
+     *      The newly minted tokens are sent to the specified `holder` address.
+     *      The caller must be the `tokenMigratorAddress`, otherwise, the transaction will revert.
      */
-    function mint(uint mintAmount) internal {
-        _mint(msg.sender, mintAmount);
+    function migrateMint(address holder, uint256 amount) external {
+        require(msg.sender == tokenMigratorAddress, "Only token migrator contract can call this function");
+        _mint(holder, amount);
     }
-
 
     /**
      * @notice Initializes the index with the specified assets, their ratios, and corresponding chain IDs.
@@ -230,16 +257,19 @@ contract IndexFund is TokenSender, TokenReceiver, ERC20, UniswapHelper {
      * @dev This function can only be called by the factory contract. It ensures that the index can only be initialized once.
      *      - Sets the `assetContracts`, `assetRatio`, `assetChains`, `chainId`, and `routerAddress` state variables.
      *      - Marks the contract as initialized to prevent re-initialization.
-     * @require The caller must be the factory contract (`factoryAddress`).
-     * @require The contract must not have been initialized before.
+     * The caller must be the factory contract (`factoryAddress`).
+     * The contract must not have been initialized before.
+     * The function is payable in order for the creator to drop off some gas for cross-chain operations.
+     * When deployed and initailized from the factory contract, some gas is dropped off by default.
      */
     function initializeIndex(
         address[] memory _assetContracts,
         uint[] memory _assetRatio,
         uint16[] memory _assetChains,
         uint16 _chainId,
-        address _routerAddress
-    ) public {
+        address _routerAddress,
+        address _tokenMigratorAddress
+    ) public payable {
         require(msg.sender == factoryAddress, "This function can only be called through the factory contract");
         require(initialized == false, "The contract has been initialized already");
         assetContracts = _assetContracts;
@@ -247,9 +277,9 @@ contract IndexFund is TokenSender, TokenReceiver, ERC20, UniswapHelper {
         assetChains = _assetChains;
         chainId = _chainId;
         routerAddress = _routerAddress;
+        tokenMigratorAddress = _tokenMigratorAddress;
         initialized = true;
     }
-
 
     /**
      * @notice Allows users to invest in the index fund by purchasing underlying assets according to their specified ratios.
@@ -261,7 +291,7 @@ contract IndexFund is TokenSender, TokenReceiver, ERC20, UniswapHelper {
      *      - The function ensures that the number of target index contracts matches the number of asset chains.
      *      - It calculates the appropriate amount to allocate to each asset based on their ratios.
      *      - After investment, if the caller has not previously minted tokens, they will receive an initial supply. Otherwise, they receive newly minted tokens based on the investment.
-     * @require The length of `targetIndexContracts` must match the length of `assetChains`.
+     * The length of `targetIndexContracts` must match the length of `assetChains`.
      */
     function investFund(uint amount, address[] memory targetIndexContracts) public {
         require(targetIndexContracts.length == assetChains.length, "Target contracts and chains mismatch");
@@ -308,11 +338,12 @@ contract IndexFund is TokenSender, TokenReceiver, ERC20, UniswapHelper {
 
         // Mint tokens to the user
         if (initialMint == false) {
-            mint(initialSupply);
+            _mint(msg.sender, initialSupply);
             initialMint = true;
         } else {
             uint256 price = IRouter(routerAddress).getPrice(address(this));
             uint256 mintAmount = amount / price;
+            _mint(msg.sender, mintAmount);
         }
     }
 
@@ -324,9 +355,9 @@ contract IndexFund is TokenSender, TokenReceiver, ERC20, UniswapHelper {
      *      - Local assets are sold directly, and the proceeds are sent to the user.
      *      - Cross-chain assets are redeemed using the `crossChainRedeem` function of the router.
      *      - The user's tokens are burned after the redemption process.
-     * @require The user must have a balance of tokens equal to or greater than the specified `amount`.
+     * The user must have a balance of tokens equal to or greater than the specified `amount`.
      */
-    function Redeem(uint amount, address[] targetIndex) public payable {
+    function Redeem(uint amount, address[] memory targetIndex) public payable {
         require(amount <= balanceOf(msg.sender), "You do not have enough tokens");
 
         // run through assetContracts in a loop
@@ -351,6 +382,25 @@ contract IndexFund is TokenSender, TokenReceiver, ERC20, UniswapHelper {
         if (balanceOf(msg.sender) == 0) {
             owners -= 1;
         }
+    }
+
+    /**
+     * @notice Initiates the migration of a specified amount of tokens to an index on a target chain.
+     * @param amount The amount of tokens to be migrated.
+     * @param targetChain The chain ID of the destination blockchain where the tokens will be migrated.
+     * @param targetIndex The address of the target index on the destination chain.
+     * @dev This function burns the specified amount of tokens from the sender's balance and triggers the cross-chain migration process.
+     *      The function calculates the cost of the cross-chain message and ensures that the caller has enough tokens to migrate.
+     *      The tokens are burned from the caller's account, and a migration request is sent to the token migrator contract.
+     *      The caller must provide enough ETH to cover the cross-chain messaging cost or the contract should enough ETH to cover the gass fees.
+     * @notice Ensure that `msg.sender` has a sufficient token balance and ETH for the cross-chain transaction fees before calling this function.
+     */
+    function migrateTokens(uint256 amount, uint16 targetChain, address targetIndex) public payable {
+        require(balanceOf(msg.sender) >= amount, "You do not have enough tokens");
+        uint256 cost = quoteCrossChainMessage(targetChain);
+        require(address(this).balance >= cost || msg.value >= cost, "Not enough gas");
+        _burn(msg.sender, amount);
+        IMigrator(tokenMigratorAddress).migrateToken{value: cost}(msg.sender, amount, targetIndex, targetChain);
     }
 
     function quoteCrossChainDeposit(
@@ -382,14 +432,11 @@ contract IndexFund is TokenSender, TokenReceiver, ERC20, UniswapHelper {
      * @notice Handles incoming payload and token transfers from the Wormhole relayer.
      * @param payload Encoded data containing the asset contract address to be used for token purchases.
      * @param receivedTokens Array of `TokenReceived` structures containing token transfer details.
-     * @param sourceAddress The source address of the message, not used in this function.
-     * @param sourceChain The source chain ID, not used in this function.
-     * @param deliveryHash A hash representing the delivery of the message, not used in this function.
      * @dev This function:
      *      - Decodes the payload to retrieve the asset contract address.
      *      - Calls the dex router function in order to purchase the specified asset tokens.
-     * @require The `receivedTokens` array must contain exactly one token transfer.
-     * @require The function can only be called by the Wormhole relayer, enforced by the `onlyWormholeRelayer` modifier.
+     * The `receivedTokens` array must contain exactly one token transfer.
+     * The function can only be called by the Wormhole relayer, enforced by the `onlyWormholeRelayer` modifier.
      */
     function receivePayloadAndTokens(
         bytes memory payload,
@@ -417,7 +464,7 @@ contract IndexFund is TokenSender, TokenReceiver, ERC20, UniswapHelper {
      *      - Ensures that only the designated router contract can call it.
      *      - Calculates the amount of tokens to be sold based on the user’s supply and the fund’s total supply.
      *      - Calls the dex router function in order to sell off the specified asset tokens.
-     * @require The caller must be the router contract, as enforced by the `require` statement.
+     * The caller must be the router contract, as enforced by the `require` statement.
      */
     function sale(
         uint256 amount,
@@ -430,7 +477,7 @@ contract IndexFund is TokenSender, TokenReceiver, ERC20, UniswapHelper {
         require(msg.sender == routerAddress, "Only router allowed");
 
         // Calculate the amount of tokens to be sold
-        uint256 sellAmount = (userSupply * IERC20(tokenAddress).balanceOf(address(this))) / fundTotalSupply;
+        uint256 sellAmount = (amount * IERC20(tokenAddress).balanceOf(address(this))) / fundTotalSupply;
 
         // Convert the output token address to the Wormhole format
         bytes32 outputTokenHomeAddress = toWormholeFormat(_outputTokenHomeAddress);
@@ -452,7 +499,7 @@ contract IndexFund is TokenSender, TokenReceiver, ERC20, UniswapHelper {
      *      - Ensures that only the owner of the index contract can call it.
      *      - Sells off all the tokens of the asset being replaced that are held in the index smart contract.
      *      - Buys the new asset tokens using the proceeds from the previous sale.
-     * @require The caller must be the router contract, as enforced by the `require` statement.
+     * The caller must be the owner(deployer) of the contract, as enforced by the `require` statement.
      */
     function replaceAsset(address oldAssetAddress, address newAssetAddress) public {
         require(msg.sender == owner, "only contract owner can call this function");

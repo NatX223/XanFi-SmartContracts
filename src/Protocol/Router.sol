@@ -126,7 +126,7 @@ contract Router is IWormholeReceiver, Ownable {
         address purchaseToken
     ) public payable {
         uint256 cost = quoteCrossChainMessage(targetChain);
-        require(msg.value == cost, "not enough gas");
+        require(msg.value >= cost, "not enough gas");
         wormholeRelayer.sendPayloadToEvm{value: cost}(
             targetChain,
             routerAddresses[targetChain],
@@ -153,7 +153,7 @@ contract Router is IWormholeReceiver, Ownable {
         uint16 sourceChain, 
         bytes32 deliveryId
     ) public payable override {
-        require(msg.sender == address(wwormholeRelayerormholeRelayer), "Only relayer allowed");
+        require(msg.sender == address(wormholeRelayer), "Only relayer allowed");
 
         // Parse the payload and execute the corresponding actions
         (uint256 totalSupply, address assetContract, uint256 amount, address targetIndex, address receiver, address outputTokenHomeAddress, uint16 sourceChainId) = abi.decode(
